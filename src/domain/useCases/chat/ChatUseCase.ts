@@ -9,30 +9,39 @@ export class ChatUseCase {
   // Obtener mensajes históricos
   async obtenerMensajes(limite: number = 50): Promise<Mensaje[]> {
     try {
+      // 🔧 CORREGIDO: Usar la sintaxis correcta para el JOIN
       const { data, error } = await supabase
         .from("mensajes")
         .select(`
           *,
-          usuarios!fk_usuario(email, rol)
+          usuario:usuarios(email, rol)
         `)
         .order("created_at", { ascending: false })
         .limit(limite);
 
       if (error) {
-        console.error("Error al obtener mensajes:", error);
+        console.error("❌ Error al obtener mensajes:", error);
         throw error;
       }
 
+      console.log("📥 Mensajes obtenidos:", data);
+
       // Mapear la respuesta para que tenga la estructura correcta
-      const mensajesFormateados = (data || []).map((msg: any) => ({
-        ...msg,
-        usuario: msg.usuarios // Renombrar usuarios a usuario
-      }));
+      const mensajesFormateados = (data || []).map((msg: any) => {
+        console.log("📝 Mensaje individual:", msg);
+        return {
+          id: msg.id,
+          contenido: msg.contenido,
+          usuario_id: msg.usuario_id,
+          created_at: msg.created_at,
+          usuario: msg.usuario // Ahora es 'usuario' singular
+        };
+      });
 
       // Invertir el orden para mostrar del más antiguo al más reciente
       return mensajesFormateados.reverse() as Mensaje[];
     } catch (error) {
-      console.error("Error al obtener mensajes:", error);
+      console.error("❌ Error al obtener mensajes:", error);
       return [];
     }
   }
@@ -57,7 +66,7 @@ export class ChatUseCase {
 
       return { success: true };
     } catch (error: any) {
-      console.error("Error al enviar mensaje:", error);
+      console.error("❌ Error al enviar mensaje:", error);
       return { success: false, error: error.message };
     }
   }
@@ -79,12 +88,12 @@ export class ChatUseCase {
           console.log('📨 Nuevo mensaje recibido!', payload.new);
 
           try {
-            // Obtener información completa del mensaje con el usuario
+            // 🔧 CORREGIDO: Usar la sintaxis correcta para el JOIN
             const { data, error } = await supabase
               .from("mensajes")
               .select(`
                 *,
-                usuarios!fk_usuario(email, rol)
+                usuario:usuarios(email, rol)
               `)
               .eq('id', payload.new.id)
               .single();
@@ -99,7 +108,7 @@ export class ChatUseCase {
                 usuario_id: payload.new.usuario_id,
                 created_at: payload.new.created_at,
                 usuario: {
-                  email: 'Desconocido',
+                  email: 'desconocido@usuario.com',
                   rol: 'usuario'
                 }
               };
@@ -110,13 +119,15 @@ export class ChatUseCase {
             }
 
             if (data) {
+              console.log('✅ Mensaje completo obtenido:', data);
+              
               // Formatear el mensaje
               const mensajeFormateado: Mensaje = {
                 id: data.id,
                 contenido: data.contenido,
                 usuario_id: data.usuario_id,
                 created_at: data.created_at,
-                usuario: data.usuarios || { email: 'Desconocido', rol: 'usuario' }
+                usuario: data.usuario || { email: 'desconocido@usuario.com', rol: 'usuario' }
               };
 
               callback(mensajeFormateado);
@@ -131,7 +142,7 @@ export class ChatUseCase {
               usuario_id: payload.new.usuario_id,
               created_at: payload.new.created_at,
               usuario: {
-                email: 'Desconocido',
+                email: 'desconocido@usuario.com',
                 rol: 'usuario'
               }
             };
@@ -141,7 +152,7 @@ export class ChatUseCase {
         }
       )
       .subscribe((status) => {
-        console.log('Estado de suscripción:', status);
+        console.log('📡 Estado de suscripción:', status);
       });
 
     // Retornar función para desuscribirse
@@ -165,7 +176,7 @@ export class ChatUseCase {
 
       return { success: true };
     } catch (error: any) {
-      console.error("Error al eliminar mensaje:", error);
+      console.error("❌ Error al eliminar mensaje:", error);
       return { success: false, error: error.message };
     }
   }
@@ -183,7 +194,7 @@ export class ChatUseCase {
           updated_at: new Date().toISOString()
         }, { onConflict: "usuario_id" });
     } catch (error) {
-      console.error("Error al notificar escritura:", error);
+      console.error("❌ Error al notificar escritura:", error);
     }
   }
 
@@ -191,6 +202,32 @@ export class ChatUseCase {
   suscribirseAEscritura(callback: (usuariosEscribiendo: string[]) => void) {
     this.typingChannel = supabase.channel('typing-channel');
 
+    // Función para obtener usuarios escribiendo
+    const obtenerUsuariosEscribiendo = async () => {
+      try {
+        // 🔧 Obtener usuarios que escribieron en los últimos 3 segundos
+        const { data, error } = await supabase
+          .from("typing_indicators")
+          .select("usuario_id, usuario:usuarios(email)")
+          .gt("updated_at", new Date(Date.now() - 3000).toISOString());
+
+        if (!error && data) {
+          console.log("👀 Usuarios escribiendo:", data);
+          // Obtener TODOS los emails (incluyendo el propio)
+          const emails = data
+            .map((item: any) => item.usuario?.email)
+            .filter(Boolean);
+          callback(emails);
+        } else {
+          callback([]);
+        }
+      } catch (err) {
+        console.error('❌ Error al obtener usuarios escribiendo:', err);
+        callback([]);
+      }
+    };
+
+    // Suscribirse a cambios en la tabla
     this.typingChannel
       .on(
         'postgres_changes',
@@ -200,31 +237,29 @@ export class ChatUseCase {
           table: 'typing_indicators'
         },
         async () => {
-          try {
-            // Obtener usuarios escribiendo en los últimos 3 segundos
-            const { data, error } = await supabase
-              .from("typing_indicators")
-              .select("usuario_id, usuarios!fk_usuario(email)")
-              .gt("updated_at", new Date(Date.now() - 3000).toISOString());
-
-            if (!error && data) {
-              const emails = data
-                .map((item: any) => item.usuarios?.email)
-                .filter(Boolean);
-              callback(emails);
-            }
-          } catch (err) {
-            console.error('Error al obtener usuarios escribiendo:', err);
-          }
+          await obtenerUsuariosEscribiendo();
         }
       )
-      .subscribe();
+      .subscribe(async (status) => {
+        console.log('📡 Estado de suscripción typing:', status);
+        if (status === 'SUBSCRIBED') {
+          // Cargar usuarios escribiendo inicialmente
+          await obtenerUsuariosEscribiendo();
+        }
+      });
 
+    // Actualizar cada segundo para limpiar usuarios inactivos
+    const intervalo = setInterval(async () => {
+      await obtenerUsuariosEscribiendo();
+    }, 1000);
+
+    // Retornar función para desuscribirse
     return () => {
       if (this.typingChannel) {
         supabase.removeChannel(this.typingChannel);
         this.typingChannel = null;
       }
+      clearInterval(intervalo);
     };
   }
 }

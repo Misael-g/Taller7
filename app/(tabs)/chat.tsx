@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { useChat } from "@/src/presentation/hooks/useChat";
 import { useAuth } from "@/src/presentation/hooks/useAuth";
@@ -51,8 +52,10 @@ export default function ChatScreen() {
 
   const renderMensaje = ({ item }: { item: Mensaje }) => {
     const esMio = item.usuario_id === usuario?.id;
-    const emailUsuario = item.usuario?.email || "Usuario desconocido";
-    const nombreCorto = emailUsuario.split('@')[0]; // Obtener la parte antes del @
+    // 🆕 Mostrar el correo completo del usuario
+    const emailUsuario = item.usuario?.email || "desconocido@usuario.com";
+    const rolUsuario = item.usuario?.rol || "usuario";
+    const esChef = rolUsuario === "chef";
 
     return (
       <View
@@ -61,20 +64,40 @@ export default function ChatScreen() {
           esMio ? styles.mensajeMio : styles.mensajeOtro,
         ]}
       >
+        {/* 🆕 ETIQUETA DE USUARIO MEJORADA */}
         <View style={styles.headerMensaje}>
-          <Text style={[
-            styles.nombreUsuario,
-            esMio && styles.nombreUsuarioMio
-          ]}>
-            {esMio ? "Tú" : nombreCorto}
-          </Text>
+          <View style={styles.usuarioInfo}>
+            <Text style={[
+              styles.nombreUsuario,
+              esMio && styles.nombreUsuarioMio
+            ]}>
+              {esMio ? "Tú" : emailUsuario}
+            </Text>
+            
+            {/* Badge del rol */}
+            {esChef && (
+              <View style={[
+                styles.badge,
+                esMio ? styles.badgeMio : styles.badgeOtro
+              ]}>
+                <Text style={[
+                  styles.badgeText,
+                  esMio && styles.badgeTextMio
+                ]}>
+                  👨‍🍳 Chef
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
+
         <Text style={[
           styles.contenidoMensaje,
           esMio && styles.contenidoMensajeMio
         ]}>
           {item.contenido}
         </Text>
+
         <Text style={[
           styles.horaMensaje,
           esMio && styles.horaMensajeMio
@@ -112,18 +135,9 @@ export default function ChatScreen() {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
       />
 
+      {/* 🆕 INDICADOR DE ESCRITURA MEJORADO */}
       {usuariosEscribiendo.length > 0 && (
-        <View style={styles.typingIndicatorContainer}>
-          <Text style={styles.typingIndicatorText}>
-            {usuariosEscribiendo.slice(0, 2).join(", ")} {usuariosEscribiendo.length > 2 ? `y ${usuariosEscribiendo.length - 2} más ` : ""}
-            está{usuariosEscribiendo.length > 1 ? "n" : ""} escribiendo
-          </Text>
-          <View style={styles.typingDots}>
-            <View style={[styles.dot, styles.dot1]} />
-            <View style={[styles.dot, styles.dot2]} />
-            <View style={[styles.dot, styles.dot3]} />
-          </View>
-        </View>
+        <TypingIndicator usuarios={usuariosEscribiendo} />
       )}
 
       <View style={styles.inputContainer}>
@@ -149,6 +163,109 @@ export default function ChatScreen() {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+// 🆕 COMPONENTE SEPARADO PARA EL TYPING INDICATOR CON ANIMACIÓN
+function TypingIndicator({ usuarios }: { usuarios: string[] }) {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const createAnimation = (dot: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 400,
+            delay,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const anim1 = createAnimation(dot1, 0);
+    const anim2 = createAnimation(dot2, 150);
+    const anim3 = createAnimation(dot3, 300);
+
+    anim1.start();
+    anim2.start();
+    anim3.start();
+
+    return () => {
+      anim1.stop();
+      anim2.stop();
+      anim3.stop();
+    };
+  }, []);
+
+  const nombreCorto = usuarios.slice(0, 2).map(email => email.split('@')[0]);
+  const textoUsuarios = nombreCorto.join(", ");
+  const masUsuarios = usuarios.length > 2 ? ` y ${usuarios.length - 2} más` : "";
+
+  return (
+    <View style={styles.typingIndicatorContainer}>
+      <Text style={styles.typingIndicatorText}>
+        {textoUsuarios}{masUsuarios} está{usuarios.length > 1 ? "n" : ""} escribiendo
+      </Text>
+      <View style={styles.typingDots}>
+        <Animated.View
+          style={[
+            styles.dot,
+            {
+              opacity: dot1,
+              transform: [
+                {
+                  translateY: dot1.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -5],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dot,
+            {
+              opacity: dot2,
+              transform: [
+                {
+                  translateY: dot2.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -5],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dot,
+            {
+              opacity: dot3,
+              transform: [
+                {
+                  translateY: dot3.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -5],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -189,19 +306,46 @@ const styles = StyleSheet.create({
   headerMensaje: {
     marginBottom: 4,
   },
-  nombreUsuario: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#666",
+  // 🆕 ESTILOS PARA LA ETIQUETA DE USUARIO
+  usuarioInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginBottom: 4,
   },
+  nombreUsuario: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#666",
+  },
   nombreUsuarioMio: {
-    color: "rgba(255, 255, 255, 0.9)",
+    color: "rgba(255, 255, 255, 0.95)",
+    fontWeight: "700",
+  },
+  badge: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  badgeMio: {
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+  },
+  badgeOtro: {
+    backgroundColor: "#4CAF50",
+  },
+  badgeText: {
+    fontSize: 10,
     fontWeight: "600",
+    color: "#FFF",
+  },
+  badgeTextMio: {
+    color: "#FFF",
   },
   contenidoMensaje: {
     fontSize: 16,
     color: "#000",
+    lineHeight: 22,
   },
   contenidoMensajeMio: {
     color: "#FFF",
@@ -248,36 +392,32 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 16,
   },
+  // 🆕 ESTILOS MEJORADOS PARA EL TYPING INDICATOR
   typingIndicatorContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#F5F5F5",
+    paddingVertical: 10,
+    backgroundColor: "#FFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
   },
   typingIndicatorText: {
     fontSize: 13,
-    color: "#999",
+    color: "#666",
     marginRight: 8,
     fontStyle: "italic",
+    fontWeight: "500",
   },
   typingDots: {
     flexDirection: "row",
     gap: 4,
+    alignItems: "center",
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#999",
-  },
-  dot1: {
-    opacity: 0.4,
-  },
-  dot2: {
-    opacity: 0.7,
-  },
-  dot3: {
-    opacity: 1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#007AFF",
   },
 });
