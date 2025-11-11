@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,14 @@ export default function HomeScreen() {
   const [busqueda, setBusqueda] = useState("");
   const [refrescando, setRefrescando] = useState(false);
   const router = useRouter();
+
+  // 🆕 ESTO ES LO NUEVO: Recargar recetas cada vez que volvemos a esta pantalla
+  useFocusEffect(
+    useCallback(() => {
+      console.log("👁️ Pantalla Home enfocada - Recargando recetas...");
+      cargarRecetas();
+    }, [])
+  );
 
   const handleBuscar = () => {
     if (busqueda.trim()) {
@@ -154,7 +162,10 @@ export default function HomeScreen() {
                   style={globalStyles.cardImage}
                   resizeMode="cover"
                   onError={(error) => {
-                    console.log("Error cargando imagen:", error.nativeEvent.error);
+                    console.log("❌ Error cargando imagen:", error.nativeEvent.error);
+                  }}
+                  onLoad={() => {
+                    console.log("✅ Imagen cargada exitosamente:", item.imagen_url);
                   }}
                 />
               ) : (
