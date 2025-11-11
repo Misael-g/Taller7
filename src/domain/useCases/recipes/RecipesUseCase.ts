@@ -71,20 +71,35 @@ export class RecipesUseCase {
     }
   }
 
-  // Actualizar receta existente
+  // Actualizar receta existente (ahora con opción de cambiar imagen)
   async actualizarReceta(
     id: string,
     titulo: string,
     descripcion: string,
-    ingredientes: string[]
+    ingredientes: string[],
+    imagenUri?: string,
+    imagenUrlAnterior?: string
   ) {
     try {
+      let imagenUrl = imagenUrlAnterior;
+
+      // Si hay una nueva imagen, la subimos
+      if (imagenUri) {
+        // Eliminar la imagen anterior si existe
+        if (imagenUrlAnterior) {
+          await this.eliminarImagen(imagenUrlAnterior);
+        }
+        
+        imagenUrl = await this.subirImagen(imagenUri);
+      }
+
       const { data, error } = await supabase
         .from("recetas")
         .update({
           titulo,
           descripcion,
           ingredientes,
+          imagen_url: imagenUrl,
         })
         .eq("id", id)
         .select()
@@ -100,6 +115,18 @@ export class RecipesUseCase {
   // Eliminar receta
   async eliminarReceta(id: string) {
     try {
+      // Primero obtenemos la receta para eliminar su imagen
+      const { data: receta } = await supabase
+        .from("recetas")
+        .select("imagen_url")
+        .eq("id", id)
+        .single();
+
+      // Eliminamos la imagen si existe
+      if (receta?.imagen_url) {
+        await this.eliminarImagen(receta.imagen_url);
+      }
+
       const { error } = await supabase.from("recetas").delete().eq("id", id);
 
       if (error) throw error;
@@ -141,6 +168,21 @@ export class RecipesUseCase {
     }
   }
 
+  // Eliminar imagen de Supabase Storage
+  private async eliminarImagen(imagenUrl: string): Promise<void> {
+    try {
+      // Extraer el nombre del archivo de la URL
+      const urlParts = imagenUrl.split("/");
+      const nombreArchivo = urlParts[urlParts.length - 1];
+
+      await supabase.storage
+        .from("recetas-fotos")
+        .remove([nombreArchivo]);
+    } catch (error) {
+      console.log("Error al eliminar imagen:", error);
+    }
+  }
+
   // Seleccionar imagen de la galería
   async seleccionarImagen(): Promise<string | null> {
     try {
@@ -168,6 +210,35 @@ export class RecipesUseCase {
       return null;
     } catch (error) {
       console.log("Error al seleccionar imagen:", error);
+      return null;
+    }
+  }
+
+  // 🆕 Tomar foto con la cámara
+  async tomarFoto(): Promise<string | null> {
+    try {
+      // Pedir permisos de cámara
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (status !== "granted") {
+        alert("Necesitamos permisos para usar la cámara");
+        return null;
+      }
+
+      // Abrir la cámara
+      const resultado = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!resultado.canceled) {
+        return resultado.assets[0].uri;
+      }
+
+      return null;
+    } catch (error) {
+      console.log("Error al tomar foto:", error);
       return null;
     }
   }

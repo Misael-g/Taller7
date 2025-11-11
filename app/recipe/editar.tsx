@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,12 +14,12 @@ import {
 import { useAuth } from "../../src/presentation/hooks/useAuth";
 import { useRecipes } from "../../src/presentation/hooks/useRecipes";
 import { globalStyles } from "../../src/styles/globalStyles";
-import { colors, fontSize, spacing } from "../../src/styles/theme";
+import { borderRadius, colors, fontSize, spacing } from "../../src/styles/theme";
 
 export default function EditarRecetaScreen() {
   const { id } = useLocalSearchParams();
   const { usuario } = useAuth();
-  const { recetas, actualizar } = useRecipes();
+  const { recetas, actualizar, seleccionarImagen, tomarFoto } = useRecipes();
   const router = useRouter();
 
   const receta = recetas.find((r) => r.id === id);
@@ -27,6 +28,8 @@ export default function EditarRecetaScreen() {
   const [descripcion, setDescripcion] = useState("");
   const [ingrediente, setIngrediente] = useState("");
   const [ingredientes, setIngredientes] = useState<string[]>([]);
+  const [imagenUri, setImagenUri] = useState<string | null>(null);
+  const [imagenUrlAnterior, setImagenUrlAnterior] = useState<string | undefined>();
   const [cargando, setCargando] = useState(false);
 
   // Cargar datos de la receta al iniciar
@@ -35,6 +38,7 @@ export default function EditarRecetaScreen() {
       setTitulo(receta.titulo);
       setDescripcion(receta.descripcion);
       setIngredientes(receta.ingredientes);
+      setImagenUrlAnterior(receta.imagen_url);
     }
   }, [receta]);
 
@@ -74,6 +78,41 @@ export default function EditarRecetaScreen() {
     setIngredientes(ingredientes.filter((_, i) => i !== index));
   };
 
+  const handleSeleccionarImagen = async () => {
+    const uri = await seleccionarImagen();
+    if (uri) {
+      setImagenUri(uri);
+    }
+  };
+
+  const handleTomarFoto = async () => {
+    const uri = await tomarFoto();
+    if (uri) {
+      setImagenUri(uri);
+    }
+  };
+
+  const mostrarOpcionesImagen = () => {
+    Alert.alert(
+      "Cambiar foto",
+      "¿De dónde quieres obtener la imagen?",
+      [
+        {
+          text: "📷 Cámara",
+          onPress: handleTomarFoto,
+        },
+        {
+          text: "🖼️ Galería",
+          onPress: handleSeleccionarImagen,
+        },
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
   const handleGuardar = async () => {
     if (!titulo || !descripcion || ingredientes.length === 0) {
       Alert.alert("Error", "Completa todos los campos");
@@ -85,7 +124,9 @@ export default function EditarRecetaScreen() {
       receta.id,
       titulo,
       descripcion,
-      ingredientes
+      ingredientes,
+      imagenUri || undefined,
+      imagenUrlAnterior
     );
     setCargando(false);
 
@@ -97,6 +138,9 @@ export default function EditarRecetaScreen() {
       Alert.alert("Error", resultado.error || "No se pudo actualizar");
     }
   };
+
+  // Determinar qué imagen mostrar
+  const imagenParaMostrar = imagenUri || imagenUrlAnterior;
 
   return (
     <ScrollView style={globalStyles.container}>
@@ -156,9 +200,41 @@ export default function EditarRecetaScreen() {
           ))}
         </View>
 
-        <Text style={styles.notaImagen}>
-          💡 Nota: La imagen no se puede cambiar por ahora
-        </Text>
+        <Text style={globalStyles.subtitle}>Imagen:</Text>
+        
+        {imagenParaMostrar ? (
+          <View>
+            <Image 
+              source={{ uri: imagenParaMostrar }} 
+              style={styles.vistaPrevia} 
+            />
+            <View style={styles.botonesImagen}>
+              <TouchableOpacity
+                style={[globalStyles.button, globalStyles.buttonSecondary, styles.botonImagenAccion]}
+                onPress={mostrarOpcionesImagen}
+              >
+                <Text style={globalStyles.buttonText}>📷 Cambiar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[globalStyles.button, globalStyles.buttonDanger, styles.botonImagenAccion]}
+                onPress={() => {
+                  setImagenUri(null);
+                  setImagenUrlAnterior(undefined);
+                }}
+              >
+                <Text style={globalStyles.buttonText}>🗑️ Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[globalStyles.button, globalStyles.buttonSecondary]}
+            onPress={mostrarOpcionesImagen}
+          >
+            <Text style={globalStyles.buttonText}>📷 Agregar Foto</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[
@@ -226,13 +302,22 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: "bold",
   },
-  notaImagen: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
-    fontStyle: "italic",
+  vistaPrevia: {
+    width: "100%",
+    height: 200,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+  },
+  botonesImagen: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  botonImagenAccion: {
+    flex: 1,
   },
   botonGuardar: {
     padding: spacing.lg,
+    marginTop: spacing.md,
   },
 });

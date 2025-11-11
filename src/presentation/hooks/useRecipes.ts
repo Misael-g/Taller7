@@ -41,7 +41,7 @@ export function useRecipes() {
       imagenUri
     );
     if (resultado.success) {
-      await cargarRecetas(); // Recargar la lista
+      await cargarRecetas();
     }
     return resultado;
   };
@@ -50,13 +50,17 @@ export function useRecipes() {
     id: string,
     titulo: string,
     descripcion: string,
-    ingredientes: string[]
+    ingredientes: string[],
+    imagenUri?: string,
+    imagenUrlAnterior?: string
   ) => {
     const resultado = await recipesUseCase.actualizarReceta(
       id,
       titulo,
       descripcion,
-      ingredientes
+      ingredientes,
+      imagenUri,
+      imagenUrlAnterior
     );
     if (resultado.success) {
       await cargarRecetas();
@@ -76,6 +80,10 @@ export function useRecipes() {
     return await recipesUseCase.seleccionarImagen();
   };
 
+  const tomarFoto = async () => {
+    return await recipesUseCase.tomarFoto();
+  };
+
   return {
     recetas,
     cargando,
@@ -85,5 +93,6 @@ export function useRecipes() {
     actualizar,
     eliminar,
     seleccionarImagen,
+    tomarFoto,
   };
 }

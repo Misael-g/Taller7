@@ -23,7 +23,7 @@ import {
 
 export default function CrearRecetaScreen() {
   const { usuario, esChef } = useAuth();
-  const { crear, seleccionarImagen } = useRecipes();
+  const { crear, seleccionarImagen, tomarFoto } = useRecipes();
   const router = useRouter();
 
   const [titulo, setTitulo] = useState("");
@@ -49,6 +49,34 @@ export default function CrearRecetaScreen() {
     if (uri) {
       setImagenUri(uri);
     }
+  };
+
+  const handleTomarFoto = async () => {
+    const uri = await tomarFoto();
+    if (uri) {
+      setImagenUri(uri);
+    }
+  };
+
+  const mostrarOpcionesImagen = () => {
+    Alert.alert(
+      "Agregar foto",
+      "¿De dónde quieres obtener la imagen?",
+      [
+        {
+          text: "📷 Cámara",
+          onPress: handleTomarFoto,
+        },
+        {
+          text: "🖼️ Galería",
+          onPress: handleSeleccionarImagen,
+        },
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+      ]
+    );
   };
 
   const handleCrear = async () => {
@@ -161,7 +189,7 @@ export default function CrearRecetaScreen() {
 
         <TouchableOpacity
           style={[globalStyles.button, globalStyles.buttonSecondary]}
-          onPress={handleSeleccionarImagen}
+          onPress={mostrarOpcionesImagen}
         >
           <Text style={globalStyles.buttonText}>
             {imagenUri ? "📷 Cambiar Foto" : "📷 Agregar Foto"}
@@ -169,7 +197,15 @@ export default function CrearRecetaScreen() {
         </TouchableOpacity>
 
         {imagenUri && (
-          <Image source={{ uri: imagenUri }} style={styles.vistaPrevia} />
+          <View>
+            <Image source={{ uri: imagenUri }} style={styles.vistaPrevia} />
+            <TouchableOpacity
+              style={styles.botonEliminarImagen}
+              onPress={() => setImagenUri(null)}
+            >
+              <Text style={styles.textoEliminarImagen}>🗑️ Eliminar foto</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         <TouchableOpacity
@@ -242,7 +278,15 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 200,
     borderRadius: borderRadius.md,
-    marginVertical: spacing.md,
+    marginTop: spacing.md,
+  },
+  botonEliminarImagen: {
+    alignSelf: "center",
+    marginVertical: spacing.sm,
+  },
+  textoEliminarImagen: {
+    color: colors.danger,
+    fontSize: fontSize.sm,
   },
   botonCrear: {
     marginTop: spacing.sm,

@@ -147,13 +147,19 @@ export default function HomeScreen() {
           }
           renderItem={({ item }) => (
             <View style={globalStyles.card}>
+              {/* IMAGEN DE LA RECETA */}
               {item.imagen_url ? (
                 <Image
                   source={{ uri: item.imagen_url }}
                   style={globalStyles.cardImage}
+                  resizeMode="cover"
+                  onError={(error) => {
+                    console.log("Error cargando imagen:", error.nativeEvent.error);
+                  }}
                 />
               ) : (
                 <View style={styles.imagenPlaceholder}>
+                  <Text style={styles.iconoPlaceholder}>🍽️</Text>
                   <Text style={globalStyles.textTertiary}>Sin imagen</Text>
                 </View>
               )}
@@ -243,6 +249,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: borderRadius.md,
+  },
+  iconoPlaceholder: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
   },
   infoReceta: {
     paddingTop: spacing.md,
